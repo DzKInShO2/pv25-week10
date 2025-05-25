@@ -98,6 +98,7 @@ class LibraryTable(QTableWidget):
 
         if query.exec():
             with open(path, "w") as f:
+                f.write("Judul,Pengarang,Tahun")
                 while query.next():
                     f.write(f"{query.value(1)},{
                             query.value(2)},{query.value(3)}\n")
