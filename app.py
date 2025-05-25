@@ -1,4 +1,7 @@
-from PyQt5.QtSql import QSqlDatabase
+from PyQt5.QtSql import (
+    QSqlDatabase,
+    QSqlQuery
+)
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -7,10 +10,12 @@ from PyQt5.QtWidgets import (
     QAction,
     QVBoxLayout,
     QFormLayout,
+    QMessageBox,
     QLineEdit,
     QLabel,
     QPushButton,
-    QTableWidget
+    QTableWidget,
+    QTableWidgetItem
 )
 
 
@@ -21,10 +26,14 @@ class CRUDWindow(QMainWindow):
         self.setFixedSize(720, 480)
         self.setWindowTitle("Manajemen Buku")
 
+        self.setupDatabase_()
+
         self.menubarInit_()
         self.menubarCallbacks_()
 
         self.widgetInit_()
+
+        print(self.sql_conn.tables())
 
     def menubarInit_(self):
         menubar = self.menuBar()
@@ -72,10 +81,19 @@ class CRUDWindow(QMainWindow):
         self.record_year = QLineEdit()
 
         self.table = QTableWidget()
-        self.table.setHorizontalHeaderLabels(["ID", "Judul", "Pengarang", "Tahun"])
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Judul", "Pengarang", "Tahun"]
+        )
+
+        self.table_active_cell = -1
+        self.table.cellChanged.connect(self.tableCellChanged_)
+        self.table.cellActivated.connect(self.tableCellActivated_)
 
         save_button = QPushButton("Simpan")
         delete_button = QPushButton("Hapus Data")
+
+        save_button.clicked.connect(self.fileSaved_)
+        delete_button.clicked.connect(self.editDeleted_)
 
         widget = QWidget()
         root = QVBoxLayout()
@@ -94,8 +112,102 @@ class CRUDWindow(QMainWindow):
 
         self.setCentralWidget(widget)
 
+    def setupDatabase_(self):
+        self.sql_conn = QSqlDatabase.addDatabase("QSQLITE")
+        self.sql_conn.setDatabaseName("perpustakaan.sqlite")
+
+        self.sql_conn.open()
+
+        QSqlQuery().exec(
+            """
+            CREATE TABLE IF NOT EXISTS Buku (
+                id INTEGER PRIMARY KEY NOT NULL,
+                judul TEXT NOT NULL,
+                pengarang TEXT NOT NULL,
+                tahun INTEGER NOT NULL
+            );
+            """
+        )
+
+        self.sql_insert_book_query = QSqlQuery()
+        self.sql_insert_book_query.prepare(
+            """
+            INSERT INTO Buku (judul, pengarang, tahun) VALUES (?, ?, ?);
+            """
+        )
+
+        self.sql_delete_book_query = QSqlQuery()
+        self.sql_delete_book_query.prepare(
+            """
+            DELETE FROM Buku WHERE id = ?;
+            """
+        )
+
+        self.sql_retrieve_all_book_query = QSqlQuery()
+        self.sql_retrieve_all_book_query.prepare(
+            """
+            SELECT * FROM Buku;
+            """
+        )
+
+        self.sql_retrieve_by_title_query = QSqlQuery()
+        self.sql_retrieve_by_title_query.prepare(
+            """
+            SELECT * FROM Buku WHERE id = ?;
+            """
+        )
+
+    def tableUpdateView_(self):
+        if self.sql_retrieve_all_book_query.exec():
+            row = 0
+            while self.sql_retrieve_all_book_query.next():
+                id = int(self.sql_retrieve_all_book_query.value(0))
+                title = str(self.sql_retrieve_all_book_query.value(1))
+                publisher = str(self.sql_retrieve_all_book_query.value(2))
+                year = int(self.sql_retrieve_all_book_query.value(3))
+
+                self.table.setItem(row, 1, QTableWidgetItem(id))
+                self.table.setItem(row, 2, QTableWidgetItem(title))
+                self.table.setItem(row, 3, QTableWidgetItem(publisher))
+                self.table.setItem(row, 4, QTableWidgetItem(year))
+
+                row += 1
+
     def fileSaved_(self):
-        pass
+        title = self.record_title.text()
+        publisher = self.record_author.text()
+        year = self.record_year.text()
+
+        if title == "":
+            QMessageBox.warning(None,
+                                "Insert Error",
+                                "Judul dari buku belum terisi mohon diisi.")
+            return
+
+        if publisher == "":
+            QMessageBox.warning(None,
+                                "Insert Error",
+                                "Pengarang dari buku belum terisi mohon diisi.")
+            return
+
+        if year == "":
+            QMessageBox.warning(None,
+                                "Insert Error",
+                                "Tahun dari buku belum terisi mohon diisi.")
+            return
+
+        if not year.isnumeric():
+            QMessageBox.warning(None,
+                                "Insert Error",
+                                "Tahun harus dalam bentuk angka.")
+            return
+
+        self.sql_insert_book_query.addBindValue(title)
+        self.sql_insert_book_query.addBindValue(publisher)
+        self.sql_insert_book_query.addBindValue(year)
+        self.sql_insert_book_query.exec()
+
+        self.tableUpdateView_()
 
     def fileExported_(self):
         pass
@@ -107,7 +219,15 @@ class CRUDWindow(QMainWindow):
         pass
 
     def editDeleted_(self):
-        pass
+        self.tableUpdateView_()
+
+    def tableCellChanged_(self, row, column):
+        _ = row
+        _ = column
+
+    def tableCellActivated_(self, row, column):
+        _ = row
+        _ = column
 
 
 if __name__ == "__main__":
