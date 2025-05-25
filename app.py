@@ -36,25 +36,25 @@ class LibraryTable(QTableWidget):
     def insertRecord(self, title, author, year):
         if title == "":
             QMessageBox.warning(None,
-                                "Insert Error",
-                                "Judul dari buku belum terisi mohon diisi.")
+                                "",
+                                "Judul buku belum terisi.")
             return False
 
         if author == "":
             QMessageBox.warning(None,
-                                "Insert Error",
-                                "Pengarang dari buku belum terisi mohon diisi.")
+                                "",
+                                "Pengarang buku belum terisi.")
             return False
 
         if year == "":
             QMessageBox.warning(None,
-                                "Insert Error",
-                                "Tahun dari buku belum terisi mohon diisi.")
+                                "",
+                                "Tahun buku belum terisi.")
             return False
 
         if not year.isnumeric():
             QMessageBox.warning(None,
-                                "Insert Error",
+                                "",
                                 "Tahun harus dalam bentuk angka.")
             return False
 
@@ -86,6 +86,9 @@ class LibraryTable(QTableWidget):
         sql_delete_book.exec()
 
         self.tableUpdateView_()
+
+    def exportToCSV(self, path):
+        pass
 
     def setupDatabase_(self, database):
         self.sql_conn = QSqlDatabase.addDatabase("QSQLITE")
