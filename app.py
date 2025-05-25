@@ -33,7 +33,7 @@ class CRUDWindow(QMainWindow):
 
         self.widgetInit_()
 
-        print(self.sql_conn.tables())
+        self.tableUpdateView_()
 
     def menubarInit_(self):
         menubar = self.menuBar()
@@ -81,6 +81,7 @@ class CRUDWindow(QMainWindow):
         self.record_year = QLineEdit()
 
         self.table = QTableWidget()
+        self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(
             ["ID", "Judul", "Pengarang", "Tahun"]
         )
@@ -159,19 +160,18 @@ class CRUDWindow(QMainWindow):
 
     def tableUpdateView_(self):
         if self.sql_retrieve_all_book_query.exec():
-            row = 0
+            rows = []
             while self.sql_retrieve_all_book_query.next():
-                id = int(self.sql_retrieve_all_book_query.value(0))
-                title = str(self.sql_retrieve_all_book_query.value(1))
-                publisher = str(self.sql_retrieve_all_book_query.value(2))
-                year = int(self.sql_retrieve_all_book_query.value(3))
+                row_data = [self.sql_retrieve_all_book_query.value(i) for i in range(
+                    self.sql_retrieve_all_book_query.record().count())]
+                rows.append(row_data)
 
-                self.table.setItem(row, 1, QTableWidgetItem(id))
-                self.table.setItem(row, 2, QTableWidgetItem(title))
-                self.table.setItem(row, 3, QTableWidgetItem(publisher))
-                self.table.setItem(row, 4, QTableWidgetItem(year))
+            row_count = len(rows)
+            self.table.setRowCount(row_count)
 
-                row += 1
+            for i in range(row_count):
+                for j in range(4):
+                    self.table.setItem(i, j, QTableWidgetItem(str(rows[i][j])))
 
     def fileSaved_(self):
         title = self.record_title.text()
@@ -228,6 +228,9 @@ class CRUDWindow(QMainWindow):
     def tableCellActivated_(self, row, column):
         _ = row
         _ = column
+
+    def closeEvent(self, _):
+        self.sql_conn.close()
 
 
 if __name__ == "__main__":
