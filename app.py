@@ -107,7 +107,15 @@ class LibraryTable(QTableWidget):
             """
         )
 
-        self.columns = ["ID", "Judul", "Pengarang", "Tahun"]
+        query = QSqlQuery()
+        query.prepare("""
+        SELECT * FROM Buku;
+        """)
+
+        self.columns = []
+        if query.exec():
+            self.columns = [query.record().fieldName(i)
+                            for i in range(query.record().count())]
 
     def updateItem_(self, item):
         sql_update_book = QSqlQuery()
@@ -229,6 +237,7 @@ class CRUDWindow(QMainWindow):
         form.addRow(QLabel("Pengarang"), self.record_author)
         form.addRow(QLabel("Tahun"), self.record_year)
 
+        root.addWidget(QLabel("F1D02310110 - Dzakanov Inshoofi"))
         root.addLayout(form)
         root.addWidget(save_button)
         root.addWidget(self.search_line)
