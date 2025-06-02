@@ -2,6 +2,7 @@ from PyQt5.QtSql import (
     QSqlDatabase,
     QSqlQuery
 )
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -9,13 +10,15 @@ from PyQt5.QtWidgets import (
     QMenu,
     QAction,
     QVBoxLayout,
+    QHBoxLayout,
     QFormLayout,
     QMessageBox,
     QLineEdit,
     QLabel,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem
+    QTableWidgetItem,
+    QFileDialog
 )
 
 
@@ -58,17 +61,17 @@ class LibraryTable(QTableWidget):
                                 "Tahun harus dalam bentuk angka.")
             return False
 
-        sql_insert_book = QSqlQuery()
-        sql_insert_book.prepare(
+        query = QSqlQuery()
+        query.prepare(
             """
             INSERT INTO Buku (Judul, Pengarang, Tahun) VALUES (?, ?, ?);
             """
         )
 
-        sql_insert_book.addBindValue(title)
-        sql_insert_book.addBindValue(author)
-        sql_insert_book.addBindValue(year)
-        sql_insert_book.exec()
+        query.addBindValue(title)
+        query.addBindValue(author)
+        query.addBindValue(year)
+        query.exec()
 
         self.tableUpdateView_()
 
@@ -88,7 +91,17 @@ class LibraryTable(QTableWidget):
         self.tableUpdateView_()
 
     def exportToCSV(self, path):
-        pass
+        query = QSqlQuery()
+        query.prepare("""
+        SELECT * FROM Buku;
+        """)
+
+        if query.exec():
+            with open(path, "w") as f:
+                f.write("Judul,Pengarang,Tahun")
+                while query.next():
+                    f.write(f"{query.value(1)},{
+                            query.value(2)},{query.value(3)}\n")
 
     def setupDatabase_(self, database):
         self.sql_conn = QSqlDatabase.addDatabase("QSQLITE")
@@ -118,42 +131,42 @@ class LibraryTable(QTableWidget):
                             for i in range(query.record().count())]
 
     def updateItem_(self, item):
-        sql_update_book = QSqlQuery()
-        sql_update_book.prepare(f"""
+        update_query = QSqlQuery()
+        update_query.prepare(f"""
         UPDATE Buku SET {self.columns[item.column()]} = ?
         WHERE ID = ?;
         """)
 
-        sql_book_id = QSqlQuery()
-        if sql_book_id.exec(f"""
+        id_query = QSqlQuery()
+        if id_query.exec(f"""
         SELECT ID FROM Buku LIMIT 1 OFFSET {item.row()};
         """):
-            sql_book_id.next()
-            sql_update_book.addBindValue(item.text())
-            sql_update_book.addBindValue(sql_book_id.value(0))
-            sql_update_book.exec()
+            id_query.next()
+            update_query.addBindValue(item.text())
+            update_query.addBindValue(id_query.value(0))
+            update_query.exec()
 
     def tableUpdateView_(self):
-        sql_retrieve_books = QSqlQuery()
+        query = QSqlQuery()
 
         if self.searched == "":
-            sql_retrieve_books.prepare("""
+            query.prepare("""
             SELECT * FROM Buku;
             """)
         else:
-            sql_retrieve_books.prepare("""
+            query.prepare("""
             SELECT * FROM Buku WHERE Judul LIKE ?;
             """)
-            sql_retrieve_books.addBindValue(f"%{self.searched}%")
+            query.addBindValue(f"%{self.searched}%")
 
-        if sql_retrieve_books.exec():
+        if query.exec():
             self.setColumnCount(len(self.columns))
             self.setHorizontalHeaderLabels(self.columns)
 
             rows = []
-            while sql_retrieve_books.next():
-                row_data = [sql_retrieve_books.value(i) for i in range(
-                    sql_retrieve_books.record().count())]
+            while query.next():
+                row_data = [query.value(i) for i in range(
+                    query.record().count())]
                 rows.append(row_data)
 
             row_count = len(rows)
@@ -168,13 +181,14 @@ class CRUDWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setFixedSize(720, 480)
+        self.setFixedSize(640, 480)
         self.setWindowTitle("Manajemen Buku")
 
         self.menubarInit_()
         self.menubarCallbacks_()
 
         self.widgetInit_()
+        self.widgetConfig_()
 
     def menubarInit_(self):
         menubar = self.menuBar()
@@ -210,7 +224,8 @@ class CRUDWindow(QMainWindow):
         self.file_exit_action_.triggered.connect(self.fileExited_)
 
         # Callback/Signal untuk menu file
-        self.edit_search_action_.triggered.connect(self.editSearched_)
+        self.edit_search_action_.triggered.connect(
+            lambda: self.search_line.setFocus())
         self.edit_delete_action_.triggered.connect(self.editDeleted_)
 
     def widgetInit_(self):
@@ -224,14 +239,27 @@ class CRUDWindow(QMainWindow):
 
         self.table = LibraryTable("perpustakaan.sql")
 
+        save = QHBoxLayout()
+
         save_button = QPushButton("Simpan")
-        delete_button = QPushButton("Hapus Data")
+        save_button.setFixedWidth(72)
         save_button.clicked.connect(self.fileSaved_)
+
+        save.addSpacing(1)
+        save.addWidget(save_button)
+        save.addSpacing(1)
+
+        delete_button = QPushButton("Hapus Data")
         delete_button.clicked.connect(self.editDeleted_)
+        delete_button.setFixedWidth(96)
 
         widget = QWidget()
         root = QVBoxLayout()
+        root.setSpacing(10)
+
         form = QFormLayout()
+        form.setFormAlignment(Qt.AlignmentFlag.AlignHCenter)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         form.addRow(QLabel("Judul"), self.record_title)
         form.addRow(QLabel("Pengarang"), self.record_author)
@@ -239,13 +267,18 @@ class CRUDWindow(QMainWindow):
 
         root.addWidget(QLabel("F1D02310110 - Dzakanov Inshoofi"))
         root.addLayout(form)
-        root.addWidget(save_button)
+        root.addLayout(save)
         root.addWidget(self.search_line)
         root.addWidget(self.table)
         root.addWidget(delete_button)
         widget.setLayout(root)
 
         self.setCentralWidget(widget)
+
+    def widgetConfig_(self):
+        self.record_title.setMaximumWidth(196)
+        self.record_author.setMaximumWidth(196)
+        self.record_year.setMaximumWidth(196)
 
     def fileSaved_(self):
         title = self.record_title.text()
@@ -258,7 +291,12 @@ class CRUDWindow(QMainWindow):
             self.record_year.clear()
 
     def fileExported_(self):
-        pass
+        path, _ = QFileDialog.getSaveFileName(self, "Simpan CSV", "",
+                                              "CSV Files (*.csv)")
+        if len(path.split(".")) == 1:
+            path += ".csv"
+
+        self.table.exportToCSV(path)
 
     def fileExited_(self):
         self.close()
@@ -271,10 +309,10 @@ class CRUDWindow(QMainWindow):
             row = self.table.currentRow()
             idx = int(self.table.item(row, 0).text())
 
-            is_continue = QMessageBox.question(self, "",
-                                               f"Hapus buku ID {idx}?",
-                                               QMessageBox.Yes | QMessageBox.No)
-            if is_continue == QMessageBox.Yes:
+            continued = QMessageBox.question(self, "",
+                                             f"Hapus buku ID {idx}?",
+                                             QMessageBox.Yes | QMessageBox.No)
+            if continued == QMessageBox.Yes:
                 self.table.deleteRecord(idx)
         else:
             QMessageBox.warning(None, "", "Tidak ada data yang dipilih.")
